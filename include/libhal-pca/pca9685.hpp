@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include <libhal/i2c.hpp>
 #include <libhal/pwm.hpp>
 #include <libhal/units.hpp>
@@ -33,10 +35,10 @@ namespace hal::pca {
  * USAGE:
  *
  *    static constexpr hal::byte address = 0b100'0000;
- *    auto pca9685 = HAL_CHECK(hal::pca::pca9685::create(i2c, address));
+ *    hal::pca::pca9685 pca9685(i2c, address);
  *    auto pwm0 = pca9685.get_pwm_channel<0>();
- *    HAL_CHECK(pwm0.frequency(1_kHz));
- *    HAL_CHECK(pwm0.duty_cycle(0.25));
+ *    pwm0.frequency(1_kHz);
+ *    pwm0.duty_cycle(0.25f);
  *
  * After creating the `pca9685` driver, it can be configured or have its
  * frequency updated. It defaults to ~200 Hz. In order to control individual PWM
@@ -57,19 +59,33 @@ public:
    *
    * Setting the duty cycle or frequency of a pwm_channel object will update the
    * pwm channel pin on the pca9685 chip.
-   *
-   * Maximum frequency is 1526 Hz
-   * Minimum frequency is 24 Hz
-   *
-   * NOTE: that setting the frequency of one pwm channel will set the frequency
-   * of all pwm channels.
    */
   class pwm_channel : public hal::pwm
   {
   private:
     pwm_channel(pca9685* p_pca9685, hal::byte p_channel);
-    result<frequency_t> driver_frequency(hal::hertz p_frequency) override;
-    result<duty_cycle_t> driver_duty_cycle(float p_duty_cycle) override;
+
+    /**
+     * @brief Change the frequency of all PWM channels
+     *
+     * Maximum frequency is 1526 Hz.
+     * Minimum frequency is 24 Hz.
+     *
+     * NOTE: that setting the frequency of one pwm channel will set the
+     * frequency of all pwm channels because they all use the same PWM
+     * frequency.
+     *
+     * @param p_frequency - frequency to set the whole pca9685 device to.
+     * @throws hal::argument_out_of_domain - if the frequency is outside of the
+     * available frequency ranges.
+     */
+    void driver_frequency(hal::hertz p_frequency) override;
+    /**
+     * @brief Set the duty cycle of an individual channel
+     *
+     * @param p_duty_cycle - the desired pwm duty cycle
+     */
+    void driver_duty_cycle(float p_duty_cycle) override;
 
     pca9685* m_pca9685;
     hal::byte m_channel;
@@ -124,14 +140,13 @@ public:
    * (0) or to VCC (1). The address is 0b100'0000 if all of the address pins are
    * pulled to GND.
    * @param p_settings - optional starting settings for the device. If this is
-   * not entered or is set to `std::nullopt`, then it
-   * @return hal::result<pca9685> - pca9685 driver object or errors from invalid
-   * configuration.
+   * not entered or is set to `std::nullopt`, then it will use the default
+   * settings.
+   * @throws hal::no_such_device - if the device cannot be found on the i2c bus
    */
-  static hal::result<pca9685> create(
-    hal::i2c& p_i2c,
-    hal::byte p_address,
-    std::optional<pca9685::settings> p_settings = std::nullopt);
+  pca9685(hal::i2c& p_i2c,
+          hal::byte p_address,
+          std::optional<pca9685::settings> p_settings = std::nullopt);
 
   /**
    * @brief Get a pwm channel object
@@ -139,16 +154,17 @@ public:
    * NOTE: If two pwm channel objects are created with the same channel number,
    * both objects will be able to control the individual pin.
    *
-   * @tparam Channel - Which channel pin to get. Can be from 0 to 15.
-   * @return pwm_channel - pwm channel object
+   * @tparam channel - Which channel pin to get. Can be from 0 to 15.
+   * @return pwm_channel - implementation of hal::pwm for an individual pin on
+   * the pca9685.
    */
-  template<hal::byte Channel>
+  template<hal::byte channel>
   pwm_channel get_pwm_channel()
   {
-    static_assert(Channel <= max_channel_count,
+    static_assert(channel <= max_channel_count,
                   "The PCA9685 only has 16 channels!");
 
-    return pwm_channel(this, Channel);
+    return pwm_channel(this, channel);
   }
 
   /**
@@ -158,15 +174,12 @@ public:
    * updating the PWM frequency.
    *
    * @param p_settings - settings to configure the device to
-   * @return hal::status - success or i2c communication error
    */
-  hal::status configure(settings p_settings);
+  void configure(const settings& p_settings);
 
 private:
-  pca9685(hal::i2c& p_i2c, hal::byte p_address);
-
-  hal::status set_channel_frequency(hal::hertz p_frequency);
-  hal::status set_channel_duty_cycle(float p_duty_cycle, hal::byte p_channel);
+  void set_channel_frequency(hal::hertz p_frequency);
+  void set_channel_duty_cycle(float p_duty_cycle, hal::byte p_channel);
 
   hal::i2c* m_i2c;
   hal::byte m_address;

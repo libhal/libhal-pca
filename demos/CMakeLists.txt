@@ -22,9 +22,7 @@ libhal_build_demos(
 
     PACKAGES
     libhal-pca
-    libhal-util
 
     LINK_LIBRARIES
     libhal::pca
-    libhal::util
 )
