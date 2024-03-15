@@ -23,18 +23,14 @@ pca9685::pwm_channel::pwm_channel(pca9685* p_pca9685, hal::byte p_channel)
 {
 }
 
-result<pwm::frequency_t> pca9685::pwm_channel::driver_frequency(
-  hal::hertz p_frequency)
+void pca9685::pwm_channel::driver_frequency(hal::hertz p_frequency)
 {
-  HAL_CHECK(m_pca9685->set_channel_frequency(p_frequency));
-  return frequency_t{};
+  m_pca9685->set_channel_frequency(p_frequency);
 }
 
-result<pwm::duty_cycle_t> pca9685::pwm_channel::driver_duty_cycle(
-  float p_duty_cycle)
+void pca9685::pwm_channel::driver_duty_cycle(float p_duty_cycle)
 {
-  HAL_CHECK(m_pca9685->set_channel_duty_cycle(p_duty_cycle, m_channel));
-  return duty_cycle_t{};
+  m_pca9685->set_channel_duty_cycle(p_duty_cycle, m_channel);
 }
 
 constexpr hal::byte pwm_channel_address(hal::byte p_channel)
@@ -43,24 +39,16 @@ constexpr hal::byte pwm_channel_address(hal::byte p_channel)
                                 (p_channel * byte_per_pwm_channel));
 }
 
-pca9685::pca9685(hal::i2c& p_i2c, hal::byte p_address)
+pca9685::pca9685(hal::i2c& p_i2c,
+                 hal::byte p_address,
+                 std::optional<pca9685::settings> p_settings)
   : m_i2c(&p_i2c)
   , m_address(p_address)
 {
+  pca9685::configure(p_settings.value_or(pca9685::settings{}));
 }
 
-hal::result<pca9685> pca9685::create(
-  hal::i2c& p_i2c,
-  hal::byte p_address,
-  std::optional<pca9685::settings> p_settings)
-{
-  using namespace hal::literals;
-  pca9685 pca(p_i2c, p_address);
-  HAL_CHECK(pca.configure(p_settings.value_or(settings{})));
-  return pca;
-}
-
-hal::status pca9685::configure(pca9685::settings p_settings)
+void pca9685::configure(const pca9685::settings& p_settings)
 {
   static constexpr hal::byte mode_address = 0U;
 
@@ -97,24 +85,21 @@ hal::status pca9685::configure(pca9685::settings p_settings)
       .insert<output_enable_pin_state>(
         hal::value(p_settings.pin_disabled_state));
 
-  HAL_CHECK(
-    hal::write(*m_i2c,
-               m_address,
-               std::array{ mode_address, mode1_byte.get(), mode2_byte.get() },
-               hal::never_timeout()));
+  hal::write(*m_i2c,
+             m_address,
+             std::array{ mode_address, mode1_byte.get(), mode2_byte.get() },
+             hal::never_timeout());
 
   m_settings = p_settings;
-
-  return hal::success();
 }
 
-hal::status pca9685::set_channel_frequency(hal::hertz p_frequency)
+void pca9685::set_channel_frequency(hal::hertz p_frequency)
 {
   using namespace hal::literals;
   static constexpr auto internal_oscillator = 25.0_MHz;
   bool within_bounds = 24.0_Hz < p_frequency && p_frequency < 1526.0_Hz;
   if (!within_bounds) {
-    return hal::new_error(std::errc::argument_out_of_domain);
+    hal::safe_throw(hal::argument_out_of_domain(this));
   }
 
   auto prescale_value =
@@ -126,20 +111,19 @@ hal::status pca9685::set_channel_frequency(hal::hertz p_frequency)
   auto original_settings = m_settings;
   // Ensure that the settings put the device to sleep.
   m_settings.sleep = true;
-  HAL_CHECK(configure(m_settings));
+  configure(m_settings);
 
-  HAL_CHECK(hal::write(*m_i2c,
-                       m_address,
-                       std::array{ prescaler_address, prescale_value_byte },
-                       hal::never_timeout()));
+  hal::write(*m_i2c,
+             m_address,
+             std::array{ prescaler_address, prescale_value_byte },
+             hal::never_timeout());
 
   // Configure device back to what it was before which may or may not be asleep
-  return configure(original_settings);
+  configure(original_settings);
 }
 
 // NOLINTNEXTLINE
-hal::status pca9685::set_channel_duty_cycle(float p_duty_cycle,
-                                            hal::byte p_channel)
+void pca9685::set_channel_duty_cycle(float p_duty_cycle, hal::byte p_channel)
 {
   // The PCA9685 works by setting a HIGH point and a LOW point out of the 12-bit
   // timer cycle. This driver implements LEFT aligned PWM for all channels, and
@@ -153,15 +137,13 @@ hal::status pca9685::set_channel_duty_cycle(float p_duty_cycle,
   hal::byte low_point_lsb = low_point & 0xFF;
   hal::byte low_point_msb = low_point >> 8;
 
-  HAL_CHECK(hal::write(*m_i2c,
-                       m_address,
-                       std::array{ pwm_channel_address(p_channel),
-                                   high_point_msb_lsb,
-                                   high_point_msb_lsb,
-                                   low_point_lsb,
-                                   low_point_msb },
-                       hal::never_timeout()));
-
-  return hal::success();
+  hal::write(*m_i2c,
+             m_address,
+             std::array{ pwm_channel_address(p_channel),
+                         high_point_msb_lsb,
+                         high_point_msb_lsb,
+                         low_point_lsb,
+                         low_point_msb },
+             hal::never_timeout());
 }
 }  // namespace hal::pca

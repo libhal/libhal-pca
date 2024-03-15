@@ -13,30 +13,13 @@
 # limitations under the License.
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout
 
 
 class demos(ConanFile):
-    settings = "compiler", "build_type"
-    generators = "CMakeToolchain", "CMakeDeps", "VirtualBuildEnv"
-    options = {"platform": ["ANY"]}
-    default_options = {"platform": "unspecified"}
-
-    def build_requirements(self):
-        self.tool_requires("cmake/3.27.1")
-        self.tool_requires("libhal-cmake-util/2.2.0")
+    python_requires = "libhal-bootstrap/[^1.0.0]"
+    python_requires_extend = "libhal-bootstrap.demo"
 
     def requirements(self):
-        self.requires("libhal-pca/2.0.0")
-
-        if str(self.options.platform).startswith("lpc40"):
-            self.requires("libhal-lpc40/[^2.1.5]")
-
-    def layout(self):
-        platform_directory = "build/" + str(self.options.platform)
-        cmake_layout(self, build_folder=platform_directory)
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
+        bootstrap = self.python_requires["libhal-bootstrap"]
+        bootstrap.module.add_demo_requirements(self)
+        self.requires("libhal-pca/[^3.0.0 || latest]")

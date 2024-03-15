@@ -20,10 +20,3 @@
 int main()
 {
 }
-
-namespace boost {
-void throw_exception(std::exception const& e)
-{
-  hal::halt();
-}
-}  // namespace boost

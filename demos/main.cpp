@@ -12,31 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <libhal/error.hpp>
+
 #include "hardware_map.hpp"
+
+hardware_map_t hardware_map{};
 
 int main()
 {
-  auto init_result = initialize_target();
-
-  if (!init_result) {
+  try {
+    hardware_map = initialize_platform();
+  } catch (...) {
     hal::halt();
   }
-
-  auto hardware_map = init_result.value();
-  auto is_finished = application(hardware_map);
-
-  if (!is_finished) {
-    hardware_map.reset();
-  } else {
-    hal::halt();
-  }
-
+  application(hardware_map);
+  hardware_map.reset();
   return 0;
 }
-
-namespace boost {
-void throw_exception(std::exception const&)
-{
-  hal::halt();
-}
-}  // namespace boost

@@ -1,25 +1,7 @@
-# Copyright 2024 Khalil Estell
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 name: ✅ CI
 
 on:
   workflow_dispatch:
-  release:
-    types:
-      - published
-      - deleted
   pull_request:
   push:
     branches:
@@ -29,22 +11,24 @@ on:
 
 jobs:
   ci:
-    uses: libhal/ci/.github/workflows/library.yml@4.x.y
+    uses: libhal/ci/.github/workflows/library_check.yml@5.x.y
     secrets: inherit
-  deploy:
-    uses: libhal/ci/.github/workflows/deploy.yml@4.x.y
-    secrets: inherit
-  build_lpc4074:
-    uses: libhal/ci/.github/workflows/demo_builder.yml@4.x.y
+
+  deploy_cortex-m4f_check:
+    uses: libhal/ci/.github/workflows/deploy.yml@5.x.y
     with:
-      profile: lpc4074
-      processor_profile: https://github.com/libhal/libhal-armcortex.git
-      platform_profile: https://github.com/libhal/libhal-lpc40.git
+      arch: cortex-m4f
+      os: baremetal
+      compiler: gcc
+      compiler_version: 12.3
+      compiler_package: arm-gnu-toolchain
     secrets: inherit
-  build_lpc4078:
-    uses: libhal/ci/.github/workflows/demo_builder.yml@4.x.y
+
+  demo_check:
+    uses: libhal/ci/.github/workflows/demo_builder.yml@5.x.y
     with:
-      profile: lpc4078
-      processor_profile: https://github.com/libhal/libhal-armcortex.git
-      platform_profile: https://github.com/libhal/libhal-lpc40.git
+      compiler_profile_url: https://github.com/libhal/arm-gnu-toolchain.git
+      compiler_profile: v1/arm-gcc-12.3
+      platform_profile_url: https://github.com/libhal/libhal-lpc40.git
+      platform_profile: v2/lpc4078
     secrets: inherit
