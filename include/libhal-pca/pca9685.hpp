@@ -175,7 +175,7 @@ public:
    *
    * @param p_settings - settings to configure the device to
    */
-  void configure(const settings& p_settings);
+  void configure(settings const& p_settings);
 
 private:
   void set_channel_frequency(hal::hertz p_frequency);

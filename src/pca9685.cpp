@@ -48,7 +48,7 @@ pca9685::pca9685(hal::i2c& p_i2c,
   pca9685::configure(p_settings.value_or(pca9685::settings{}));
 }
 
-void pca9685::configure(const pca9685::settings& p_settings)
+void pca9685::configure(pca9685::settings const& p_settings)
 {
   static constexpr hal::byte mode_address = 0U;
 
